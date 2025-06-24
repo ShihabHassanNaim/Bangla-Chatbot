@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>বাংলা চ্যাটবট</title>
+    <style>
+        body {
+            font-family: 'SolaimanLipi', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2em;
+        }
+        .chat-container {
+            height: 400px;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f9f9f9;
+            border-bottom: 1px solid #ddd;
+        }
+        .message {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 10px;
+            max-width: 80%;
+        }
+        .user-message {
+            background: #e3f2fd;
+            margin-left: auto;
+            text-align: right;
+            border: 1px solid #2196F3;
+        }
+        .bot-message {
+            background: #e8f5e8;
+            margin-right: auto;
+            border: 1px solid #4CAF50;
+        }
+        .input-container {
+            padding: 20px;
+            background: white;
+            display: flex;
+            gap: 10px;
+        }
+        #userInput {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 25px;
+            font-size: 16px;
+            outline: none;
+        }
+        #userInput:focus {
+            border-color: #4CAF50;
+        }
+        button {
+            padding: 12px 25px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            color: #666;
+            font-style: italic;
+        }
+        .error {
+            color: #f44336;
+            background: #ffebee;
+            border: 1px solid #f44336;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 বাংলা চ্যাটবট</h1>
+            <p>আপনার বাংলা ভাষার সহায়ক</p>
+        </div>
+        
+        <div id="chatContainer" class="chat-container">
+            <div class="message bot-message">
+                নমস্কার! আমি আপনার বাংলা চ্যাটবট। আপনি আমাকে যেকোনো প্রশ্ন করতে পারেন। 🙏
+            </div>
+        </div>
+        
+        <div class="loading" id="loading">চ্যাটবট চিন্তা করছে...</div>
+        
+        <div class="input-container">
+            <input type="text" id="userInput" placeholder="আপনার বার্তা লিখুন..." />
+            <button onclick="sendMessage()" id="sendButton">পাঠান</button>
+        </div>
+    </div>    <script>
+        const chatContainer = document.getElementById('chatContainer');
+        const userInput = document.getElementById('userInput');
+        const sendButton = document.getElementById('sendButton');
+        const loading = document.getElementById('loading');
+
+        function addMessage(message, isUser = false, isError = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}${isError ? ' error' : ''}`;
+            messageDiv.textContent = message;
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            if (!message) return;
+
+            // Disable input and button
+            userInput.disabled = true;
+            sendButton.disabled = true;
+            loading.style.display = 'block';
+
+            // Add user message
+            addMessage(message, true);
+            userInput.value = '';
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({message: message})
+                });
+
+                const data = await response.json();
+                
+                if (response.ok && data.reply) {
+                    addMessage(data.reply);
+                } else {
+                    addMessage(data.error || 'কিছু সমস্যা হয়েছে।', false, true);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                addMessage('সংযোগে সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।', false, true);
+            } finally {
+                // Re-enable input and button
+                userInput.disabled = false;
+                sendButton.disabled = false;
+                loading.style.display = 'none';
+                userInput.focus();
+            }
+        }
+
+        // Enable Enter key to send message
+        userInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !userInput.disabled) {
+                sendMessage();
+            }
+        });
+
+        // Focus on input when page loads
+        window.addEventListener('load', function() {
+            userInput.focus();
+        });
+
+        // Check if backend is healthy
+        async function checkHealth() {
+            try {
+                const response = await fetch('/health');
+                const data = await response.json();
+                if (data.status !== 'healthy') {
+                    addMessage('⚠️ সিস্টেম সম্পূর্ণভাবে প্রস্তুত নয়। Ollama চালু আছে কিনা পরীক্ষা করুন।', false, true);
+                }
+            } catch (error) {
+                addMessage('⚠️ ব্যাকএন্ড সংযোগ পরীক্ষা করা যায়নি।', false, true);
+            }
+        }
+
+        // Check health on page load
+        window.addEventListener('load', checkHealth);
+    </script>
+</body>
+</html>
